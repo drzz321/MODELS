@@ -75,9 +75,9 @@ def train_models(df, target_col, categorical_cols):
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42, stratify=y)
     models = {
         "Random Forest": RandomForestClassifier(n_estimators=100, random_state=42),
-        "Logistic Regression": LogisticRegression(random_state=42, max_iter=2000),
+        "Logistic Regression": LogisticRegression(random_state=42, max_iter=5000),
         "Decision Tree": DecisionTreeClassifier(random_state=42),
-        "SVM": SVC(probability=True, random_state=42),
+        "SVM": SVC(probability=False, random_state=42),
         "KNN": KNeighborsClassifier(),
         "Naive Bayes": GaussianNB()
     }
