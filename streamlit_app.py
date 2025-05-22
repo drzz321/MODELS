@@ -133,21 +133,6 @@ if page == "Model Training":
     if target_col in default_cats:
         default_cats.remove(target_col)
     categorical_cols = st.multiselect("Select categorical columns", df.columns, default=default_cats)
-    # Manual input preview
-    st.markdown("---")
-    st.subheader("Step 3: Manual Input Example (Optional)")
-    st.info("You can manually input feature values below to see how a sample row would look. This does not make a prediction until after training.")
-    manual_input = {}
-    for col in df.columns:
-        if col == target_col:
-            continue
-        if col in categorical_cols:
-            options = df[col].unique().tolist()
-            manual_input[col] = st.selectbox(f"{col}", options, key=f"manual_{col}")
-        else:
-            manual_input[col] = st.number_input(f"{col}", key=f"manual_{col}")
-    st.write("Your manual input as a DataFrame:")
-    st.write(pd.DataFrame([manual_input]))
     # Training controls
     st.subheader("Training Controls")
     # Only enable training if all classes have at least 2 samples
