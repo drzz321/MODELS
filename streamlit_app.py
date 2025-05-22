@@ -160,6 +160,32 @@ if page == "Model Training":
                             sns.barplot(x='Importance', y='Feature', data=feat_df, ax=ax)
                             ax.set_title('Random Forest - Feature Importances')
                             st.pyplot(fig)
+                        # --- User Input for Prediction ---
+                        st.subheader("Try a Prediction with Your Model")
+                        st.info("Enter feature values below to see a prediction from the best model.")
+                        input_data = {}
+                        for col in feature_names:
+                            if col in categorical_cols:
+                                le = label_encoders[col]
+                                options = list(le.classes_)
+                                input_data[col] = st.selectbox(f"{col}", options, key=f"input_{col}")
+                            else:
+                                input_data[col] = st.number_input(f"{col}", key=f"input_{col}")
+                        if st.button("Predict with Best Model"):
+                            input_df = pd.DataFrame([input_data])
+                            for col in categorical_cols:
+                                le = label_encoders[col]
+                                try:
+                                    input_df[col] = le.transform(input_df[col])
+                                except Exception:
+                                    input_df[col] = 0
+                            input_df = input_df.reindex(columns=feature_names, fill_value=0)
+                            prediction = best_model.predict(input_df)[0]
+                            prediction_proba = best_model.predict_proba(input_df)[0] if hasattr(best_model, 'predict_proba') else None
+                            st.markdown(f"**Predicted Class:** `{prediction}`")
+                            if prediction_proba is not None:
+                                st.write("Class Probabilities:")
+                                st.write(dict(zip(best_model.classes_, prediction_proba)))
                     except Exception as e:
                         st.error(f"Error during training: {str(e)}")
             else:
