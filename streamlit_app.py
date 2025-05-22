@@ -208,8 +208,8 @@ if page == "Model Training":
                     st.error(f"Error during training: {str(e)}")
         else:
             st.error("Please provide training data and select target column.")
-    if st.session_state.model_trained:
-        st.success("✅ Models are ready for prediction!")
+    # if st.session_state.model_trained:
+    #     st.success("✅ Models are ready for prediction!")
 
 # # --- Prediction Page ---
 # if page == "Prediction":
