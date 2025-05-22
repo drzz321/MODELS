@@ -115,6 +115,11 @@ if page == "Model Training":
     # User selects target column
     st.subheader("Step 2: Select Target and Categorical Columns")
     target_col = st.selectbox("Select the target column (label)", df.columns)
+    # Warn if any class has <2 samples
+    class_counts = df[target_col].value_counts()
+    if (class_counts < 2).any():
+        st.error(f"The selected target column contains at least one class with fewer than 2 samples. Please check your data or choose a different target column.\nClass counts:\n{class_counts.to_string()}")
+        st.stop()
     default_cats = list(df.select_dtypes(include=['object']).columns)
     if target_col in default_cats:
         default_cats.remove(target_col)
