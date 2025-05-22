@@ -194,22 +194,6 @@ if page == "Model Training":
             st.error("Please provide training data and select target column.")
     if st.session_state.model_trained:
         st.success("✅ Models are ready for prediction!")
-        # Show best model performance metrics and confusion matrix after training
-        best_model_name = max(st.session_state.model_performance.keys(), key=lambda k: st.session_state.model_performance[k]['f1'])
-        best_results = st.session_state.model_performance[best_model_name]
-        st.subheader(f"Best Model: {best_model_name}")
-        st.write(f"**Accuracy:** {best_results['accuracy']:.4f}")
-        st.write(f"**Precision:** {best_results['precision']:.4f}")
-        st.write(f"**Recall:** {best_results['recall']:.4f}")
-        st.write(f"**F1 Score:** {best_results['f1']:.4f}")
-        st.markdown("**Confusion Matrix:**")
-        cm = best_results['confusion_matrix']
-        fig, ax = plt.subplots(figsize=(6, 4))
-        sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', ax=ax)
-        plt.title(f'Confusion Matrix - {best_model_name}')
-        plt.ylabel('True Label')
-        plt.xlabel('Predicted Label')
-        st.pyplot(fig)
 
 # --- Prediction Page ---
 if page == "Prediction":
