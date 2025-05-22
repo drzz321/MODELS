@@ -19,8 +19,8 @@ import os
 
 # Page configuration (must be first Streamlit command)
 st.set_page_config(
-    page_title="Loan Prediction App",
-    page_icon="💰",
+    page_title="Prediction App",
+    page_icon="🔮",  # Example: Crystal Ball emoji
     layout="wide",
     initial_sidebar_state="expanded"
 )
