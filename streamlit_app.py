@@ -37,7 +37,7 @@ if 'model_performance' not in st.session_state:
     st.session_state.model_performance = {}
 
 # Header
-st.markdown('<h1 class="main-header">💰 Loan Prediction System</h1>', unsafe_allow_html=True)
+st.markdown('<h1 class="main-header">🔮 Prediction App</h1>', unsafe_allow_html=True)
 st.markdown("---")
 
 # Sidebar
