@@ -77,7 +77,7 @@ def train_models(df, target_col, categorical_cols):
         "Random Forest": RandomForestClassifier(n_estimators=100, random_state=42),
         "Logistic Regression": LogisticRegression(random_state=42, max_iter=1000),
         "Decision Tree": DecisionTreeClassifier(random_state=42),
-        "SVM": SVC(probability=False, random_state=42),
+        "SVM": SVC(probability=True, random_state=42),
         "KNN": KNeighborsClassifier(),
         "Naive Bayes": GaussianNB()
     }
