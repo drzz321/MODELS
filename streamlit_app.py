@@ -26,65 +26,7 @@ st.set_page_config(
 )
 
 # --- Load deployment artifacts ---
-DEPLOY_DIR = 'streamlit_deploy_artifacts'
-model_path = os.path.join(DEPLOY_DIR, 'best_model.joblib')
-encoders_path = os.path.join(DEPLOY_DIR, 'label_encoders.joblib')
-columns_path = os.path.join(DEPLOY_DIR, 'X_train_columns.joblib')
-metrics_path = os.path.join(DEPLOY_DIR, 'performance_metrics.joblib')
-cmatrix_path = os.path.join(DEPLOY_DIR, 'confusion_matrix_data.joblib')
-
-# Load model and preprocessors if available
-if os.path.exists(model_path):
-    best_model = joblib.load(model_path)
-    label_encoders = joblib.load(encoders_path)
-    feature_names = joblib.load(columns_path)
-    performance_metrics = joblib.load(metrics_path)
-    confusion_matrix_data = joblib.load(cmatrix_path)
-    st.session_state.best_model = best_model
-    st.session_state.label_encoders = label_encoders
-    st.session_state.feature_names = feature_names
-    st.session_state.model_trained = True
-    st.session_state.performance_metrics = performance_metrics
-    st.session_state.confusion_matrix_data = confusion_matrix_data
-    st.info('Loaded pre-trained Random Forest model and preprocessors.')
-else:
-    st.warning('Pre-trained model not found. Please train a model first.')
-
-# Custom CSS for better styling
-st.markdown("""
-<style>
-    .main-header {
-        font-size: 3rem;
-        color: #1f77b4;
-        text-align: center;
-        margin-bottom: 2rem;
-    }
-    .metric-card {
-        background-color: #f0f2f6;
-        padding: 1rem;
-        border-radius: 0.5rem;
-        border-left: 4px solid #1f77b4;
-    }
-    .prediction-result {
-        font-size: 1.5rem;
-        font-weight: bold;
-        text-align: center;
-        padding: 1rem;
-        border-radius: 0.5rem;
-        margin: 1rem 0;
-    }
-    .approved {
-        background-color: #d4edda;
-        color: #155724;
-        border: 1px solid #c3e6cb;
-    }
-    .rejected {
-        background-color: #f8d7da;
-        color: #721c24;
-        border: 1px solid #f5c6cb;
-    }
-</style>
-""", unsafe_allow_html=True)
+# Remove all pre-trained model loading logic, require user upload and training
 
 # Initialize session state
 if 'model_trained' not in st.session_state:
@@ -102,139 +44,98 @@ st.markdown("---")
 st.sidebar.title("Navigation")
 page = st.sidebar.selectbox("Choose a page", ["Model Training", "Single Prediction", "Batch Prediction", "Model Performance"])
 
-# Load actual dataset for demonstration and training
-@st.cache_data
-def load_sample_data():
-    """Load actual loan data from Loans.csv for demonstration and training purposes"""
-    df = pd.read_csv('Loans.csv')
-    return df
-
-def preprocess_data(df):
+# --- Flexible CSV structure: user selects target and categorical columns ---
+def preprocess_data(df, target_col, categorical_cols):
     """Preprocess the data for training"""
     df_processed = df.copy()
-    
-    # Encode categorical variables
-    categorical_cols = df_processed.select_dtypes(include=['object']).columns
     label_encoders = {}
-    
     for col in categorical_cols:
-        if col != 'loan_status':
-            le = LabelEncoder()
-            df_processed[col] = le.fit_transform(df_processed[col].astype(str))
-            label_encoders[col] = le
-    
+        le = LabelEncoder()
+        df_processed[col] = le.fit_transform(df_processed[col].astype(str))
+        label_encoders[col] = le
     return df_processed, label_encoders
 
-def train_models(df):
-    """Train multiple models and return the best one"""
-    df_processed, label_encoders = preprocess_data(df)
-    
-    X = df_processed.drop('loan_status', axis=1)
-    y = df_processed['loan_status']
-    
+def train_models(df, target_col, categorical_cols):
+    df_processed, label_encoders = preprocess_data(df, target_col, categorical_cols)
+    X = df_processed.drop(target_col, axis=1)
+    y = df_processed[target_col]
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42, stratify=y)
-    
     models = {
         "Random Forest": RandomForestClassifier(n_estimators=100, random_state=42),
         "Logistic Regression": LogisticRegression(random_state=42, max_iter=1000),
         "Decision Tree": DecisionTreeClassifier(random_state=42),
-        "SVM": SVC(random_state=42),
+        "SVM": SVC(probability=True, random_state=42),
         "KNN": KNeighborsClassifier(),
         "Naive Bayes": GaussianNB()
     }
-    
     model_results = {}
-    
     for name, model in models.items():
         model.fit(X_train, y_train)
         y_pred = model.predict(X_test)
-        
         model_results[name] = {
             'model': model,
             'accuracy': accuracy_score(y_test, y_pred),
-            'precision': precision_score(y_test, y_pred),
-            'recall': recall_score(y_test, y_pred),
-            'f1': f1_score(y_test, y_pred),
+            'precision': precision_score(y_test, y_pred, average='weighted', zero_division=0),
+            'recall': recall_score(y_test, y_pred, average='weighted', zero_division=0),
+            'f1': f1_score(y_test, y_pred, average='weighted', zero_division=0),
             'confusion_matrix': confusion_matrix(y_test, y_pred),
             'y_test': y_test,
             'y_pred': y_pred
         }
-    
-    # Find best model based on F1 score
     best_model_name = max(model_results.keys(), key=lambda k: model_results[k]['f1'])
     best_model = model_results[best_model_name]['model']
-    
-    return best_model, model_results, label_encoders, X.columns.tolist()
+    return best_model, model_results, label_encoders, X.columns.tolist(), best_model_name
 
 # Page 1: Model Training
 if page == "Model Training":
     st.header("🔧 Model Training")
-    
     col1, col2 = st.columns([2, 1])
-    
     with col1:
         st.subheader("Training Data")
-        
-        # Only allow CSV upload, remove sample data option
+        st.info("Upload any CSV file for classification. Select your target and categorical columns.")
         uploaded_file = st.file_uploader("Upload your CSV file for training", type="csv")
         if uploaded_file is not None:
             df = pd.read_csv(uploaded_file)
             st.write("Uploaded data shape:", df.shape)
             st.write(df.head())
+            # User selects target column
+            target_col = st.selectbox("Select the target column (label)", df.columns)
+            # User selects categorical columns
+            default_cats = list(df.select_dtypes(include=['object']).columns)
+            if target_col in default_cats:
+                default_cats.remove(target_col)
+            categorical_cols = st.multiselect("Select categorical columns", df.columns, default=default_cats)
         else:
-            st.info("Please upload a CSV file to proceed with training.")
+            st.warning("Please upload a CSV file to proceed with training.")
             df = None
-        # Optionally, you can add EDA here if df is not None
-        # if df is not None:
-        #     st.markdown("---")
-        #     st.subheader("Exploratory Data Analysis (EDA)")
-        #     st.markdown("**Class Balance:**")
-        #     fig, ax = plt.subplots()
-        #     sns.countplot(data=df, x='loan_status', ax=ax)
-        #     ax.set_title('Class Distribution of loan_status')
-        #     st.pyplot(fig)
-        #     st.markdown("**Feature Types:**")
-        #     st.write(df.dtypes.value_counts())
-        #     st.write(df.dtypes)
-        #     st.markdown("**Missing Data:**")
-        #     missing = df.isnull().sum()
-        #     st.write(missing[missing > 0] if missing.sum() > 0 else "No missing values.")
-        #     if missing.sum() > 0:
-        #         fig, ax = plt.subplots(figsize=(8, 2))
-        #         sns.heatmap(df.isnull(), cbar=False, yticklabels=False, ax=ax)
-        #         st.pyplot(fig)
-    
+            target_col = None
+            categorical_cols = []
     with col2:
         st.subheader("Training Controls")
-        
         if st.button("🚀 Train Models", type="primary"):
-            if df is not None:
+            if df is not None and target_col is not None:
                 with st.spinner("Training models... This may take a few minutes."):
                     try:
-                        best_model, model_results, label_encoders, feature_names = train_models(df)
+                        best_model, model_results, label_encoders, feature_names, best_model_name = train_models(df, target_col, categorical_cols)
                         st.session_state.best_model = best_model
                         st.session_state.model_performance = model_results
                         st.session_state.label_encoders = label_encoders
                         st.session_state.feature_names = feature_names
                         st.session_state.model_trained = True
+                        st.session_state.target_col = target_col
+                        st.session_state.categorical_cols = categorical_cols
                         st.success("✅ Models trained successfully!")
-                        # Display best model info
-                        best_model_name = max(model_results.keys(), key=lambda k: model_results[k]['f1'])
                         st.info(f"🏆 Best Model: {best_model_name} (F1 Score: {model_results[best_model_name]['f1']:.4f})")
-                        # Display accuracy and confusion matrix for best model
                         st.markdown("**Accuracy:**")
                         st.write(f"{model_results[best_model_name]['accuracy']:.4f}")
                         st.markdown("**Confusion Matrix:**")
                         cm = model_results[best_model_name]['confusion_matrix']
                         fig, ax = plt.subplots(figsize=(6, 4))
-                        sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', ax=ax,
-                                    xticklabels=['Rejected', 'Approved'],
-                                    yticklabels=['Rejected', 'Approved'])
+                        sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', ax=ax)
                         plt.title(f'Confusion Matrix - {best_model_name}')
                         plt.ylabel('True Label')
                         plt.xlabel('Predicted Label')
                         st.pyplot(fig)
-                        # Feature importance (if Random Forest is best)
                         if best_model_name == "Random Forest":
                             st.markdown("**Feature Importances (Random Forest):**")
                             importances = best_model.feature_importances_
@@ -247,249 +148,92 @@ if page == "Model Training":
                     except Exception as e:
                         st.error(f"Error during training: {str(e)}")
             else:
-                st.error("Please provide training data first.")
-    
+                st.error("Please provide training data and select target column.")
     if st.session_state.model_trained:
         st.success("✅ Models are ready for prediction!")
 
 # Page 2: Single Prediction
 elif page == "Single Prediction":
-    st.header("🎯 Single Loan Prediction")
-    
+    st.header("🎯 Single Prediction")
     if not st.session_state.model_trained:
         st.warning("⚠️ Please train the models first in the 'Model Training' page.")
     else:
-        st.subheader("Enter Loan Application Details")
-        
-        col1, col2, col3 = st.columns(3)
-        
-        with col1:
-            loan_amnt = st.number_input("Loan Amount ($)", min_value=1000, max_value=100000, value=25000)
-            term = st.selectbox("Term (months)", [36, 60])
-            annual_inc = st.number_input("Annual Income ($)", min_value=10000, max_value=500000, value=50000)
-            dti = st.slider("Debt-to-Income Ratio", 0.0, 50.0, 15.0)
-            emp_length = st.slider("Employment Length (years)", 0, 15, 5)
-        
-        with col2:
-            home_ownership = st.selectbox("Home Ownership", ["RENT", "OWN", "MORTGAGE"])
-            verification_status = st.selectbox("Verification Status", ["Verified", "Source Verified", "Not Verified"])
-            purpose = st.selectbox("Loan Purpose", ["debt_consolidation", "credit_card", "home_improvement", "other"])
-            delinq_2yrs = st.number_input("Delinquencies (2 years)", min_value=0, max_value=10, value=0)
-            inq_last_6mths = st.number_input("Inquiries (6 months)", min_value=0, max_value=20, value=1)
-        
-        with col3:
-            open_acc = st.number_input("Open Accounts", min_value=1, max_value=50, value=10)
-            pub_rec = st.number_input("Public Records", min_value=0, max_value=10, value=0)
-            revol_bal = st.number_input("Revolving Balance ($)", min_value=0, max_value=200000, value=15000)
-            revol_util = st.slider("Revolving Utilization (%)", 0.0, 100.0, 50.0)
-            total_acc = st.number_input("Total Accounts", min_value=1, max_value=100, value=20)
-        
-        if st.button("🔮 Predict Loan Status", type="primary"):
-            # Create input dataframe
-            input_data = pd.DataFrame({
-                'loan_amnt': [loan_amnt],
-                'term': [term],
-                'annual_inc': [annual_inc],
-                'dti': [dti],
-                'emp_length': [emp_length],
-                'home_ownership': [home_ownership],
-                'verification_status': [verification_status],
-                'purpose': [purpose],
-                'delinq_2yrs': [delinq_2yrs],
-                'inq_last_6mths': [inq_last_6mths],
-                'open_acc': [open_acc],
-                'pub_rec': [pub_rec],
-                'revol_bal': [revol_bal],
-                'revol_util': [revol_util],
-                'total_acc': [total_acc]
-            })
-            
-            # Encode categorical variables
-            for col in ['home_ownership', 'verification_status', 'purpose']:
-                if col in st.session_state.label_encoders:
-                    try:
-                        input_data[col] = st.session_state.label_encoders[col].transform(input_data[col])
-                    except ValueError:
-                        # Handle unseen categories
-                        input_data[col] = 0
-            
-            # Make prediction
-            prediction = st.session_state.best_model.predict(input_data)[0]
-            prediction_proba = st.session_state.best_model.predict_proba(input_data)[0] if hasattr(st.session_state.best_model, 'predict_proba') else None
-            
-            # Display result
-            if prediction == 1:
-                st.markdown('<div class="prediction-result approved">✅ LOAN APPROVED</div>', unsafe_allow_html=True)
+        st.subheader("Enter Feature Values for Prediction")
+        input_data = {}
+        for col in st.session_state.feature_names:
+            if col in st.session_state.categorical_cols:
+                le = st.session_state.label_encoders[col]
+                options = list(le.classes_)
+                input_data[col] = st.selectbox(f"{col}", options)
             else:
-                st.markdown('<div class="prediction-result rejected">❌ LOAN REJECTED</div>', unsafe_allow_html=True)
-            
+                input_data[col] = st.number_input(f"{col}")
+        if st.button("🔮 Predict", type="primary"):
+            input_df = pd.DataFrame([input_data])
+            for col in st.session_state.categorical_cols:
+                le = st.session_state.label_encoders[col]
+                try:
+                    input_df[col] = le.transform(input_df[col])
+                except Exception:
+                    input_df[col] = 0
+            input_df = input_df.reindex(columns=st.session_state.feature_names, fill_value=0)
+            prediction = st.session_state.best_model.predict(input_df)[0]
+            prediction_proba = st.session_state.best_model.predict_proba(input_df)[0] if hasattr(st.session_state.best_model, 'predict_proba') else None
+            st.markdown(f"**Predicted Class:** `{prediction}`")
             if prediction_proba is not None:
-                col1, col2 = st.columns(2)
-                with col1:
-                    st.metric("Approval Probability", f"{prediction_proba[1]:.2%}")
-                with col2:
-                    st.metric("Rejection Probability", f"{prediction_proba[0]:.2%}")
+                st.write("Class Probabilities:")
+                st.write(dict(zip(st.session_state.best_model.classes_, prediction_proba)))
 
 # Page 3: Batch Prediction
 elif page == "Batch Prediction":
-    st.header("📊 Batch Loan Prediction")
-    
+    st.header("📊 Batch Prediction")
     if not st.session_state.model_trained:
         st.warning("⚠️ Please train the models first in the 'Model Training' page.")
     else:
         st.subheader("Upload CSV File for Batch Prediction")
-        
         uploaded_file = st.file_uploader("Choose a CSV file", type="csv", key="batch_upload")
-        
         if uploaded_file is not None:
             batch_df = pd.read_csv(uploaded_file)
-            
             st.write("Uploaded data shape:", batch_df.shape)
             st.write("Preview of uploaded data:")
             st.write(batch_df.head())
-            
             if st.button("🔮 Make Batch Predictions", type="primary"):
                 try:
-                    # Preprocess the batch data
                     batch_processed = batch_df.copy()
-                    
-                    # Encode categorical variables
-                    categorical_cols = ['home_ownership', 'verification_status', 'purpose']
-                    for col in categorical_cols:
+                    for col in st.session_state.categorical_cols:
                         if col in batch_processed.columns and col in st.session_state.label_encoders:
+                            le = st.session_state.label_encoders[col]
                             try:
-                                batch_processed[col] = st.session_state.label_encoders[col].transform(batch_processed[col].astype(str))
-                            except ValueError:
-                                # Handle unseen categories
+                                batch_processed[col] = le.transform(batch_processed[col].astype(str))
+                            except Exception:
                                 batch_processed[col] = 0
-                    
-                    # Make predictions
+                    if st.session_state.target_col in batch_processed.columns:
+                        batch_processed = batch_processed.drop(columns=[st.session_state.target_col])
+                    batch_processed = batch_processed.reindex(columns=st.session_state.feature_names, fill_value=0)
                     predictions = st.session_state.best_model.predict(batch_processed)
-                    
-                    # Add predictions to the original dataframe
                     result_df = batch_df.copy()
-                    result_df['Predicted_Loan_Status'] = predictions
-                    result_df['Prediction_Label'] = result_df['Predicted_Loan_Status'].map({1: 'Approved', 0: 'Rejected'})
-                    
-                    # Display results
+                    result_df['Predicted_Class'] = predictions
                     st.subheader("Prediction Results")
                     st.write(result_df)
-                    
-                    # Summary statistics
-                    col1, col2, col3 = st.columns(3)
+                    col1, col2 = st.columns(2)
                     with col1:
-                        st.metric("Total Applications", len(result_df))
+                        st.metric("Total Samples", len(result_df))
                     with col2:
-                        approved_count = sum(predictions)
-                        st.metric("Approved", approved_count)
-                    with col3:
-                        rejected_count = len(predictions) - approved_count
-                        st.metric("Rejected", rejected_count)
-                    
-                    # Download button
+                        st.metric("Unique Predicted Classes", len(set(predictions)))
                     csv = result_df.to_csv(index=False)
                     st.download_button(
                         label="📥 Download Results as CSV",
                         data=csv,
-                        file_name="loan_predictions.csv",
+                        file_name="predictions.csv",
                         mime="text/csv"
                     )
-                    
-                    # Visualization
                     fig, ax = plt.subplots(figsize=(8, 6))
-                    result_df['Prediction_Label'].value_counts().plot(kind='bar', ax=ax)
+                    result_df['Predicted_Class'].value_counts().plot(kind='bar', ax=ax)
                     plt.title('Batch Prediction Results')
                     plt.ylabel('Count')
                     plt.xticks(rotation=0)
                     st.pyplot(fig)
-                    
                 except Exception as e:
                     st.error(f"Error during batch prediction: {str(e)}")
-
-# Page 4: Model Performance
-elif page == "Model Performance":
-    st.header("📈 Model Performance Summary")
-    
-    if not st.session_state.model_trained:
-        st.warning("⚠️ Please train the models first in the 'Model Training' page.")
-    else:
-        st.subheader("Random Forest Model Performance (from training script)")
-        if hasattr(st.session_state, 'performance_metrics'):
-            metrics = st.session_state.performance_metrics
-            st.write(pd.DataFrame([metrics]))
-        if hasattr(st.session_state, 'confusion_matrix_data'):
-            cm = st.session_state.confusion_matrix_data
-            fig, ax = plt.subplots(figsize=(6, 4))
-            sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', ax=ax,
-                        xticklabels=['Rejected', 'Approved'],
-                        yticklabels=['Rejected', 'Approved'])
-            plt.title('Confusion Matrix (Random Forest)')
-            plt.ylabel('True Label')
-            plt.xlabel('Predicted Label')
-            st.pyplot(fig)
-        
-        st.subheader("Model Comparison")
-        
-        # Create performance comparison dataframe
-        performance_data = []
-        for model_name, results in st.session_state.model_performance.items():
-            performance_data.append({
-                'Model': model_name,
-                'Accuracy': results['accuracy'],
-                'Precision': results['precision'],
-                'Recall': results['recall'],
-                'F1 Score': results['f1']
-            })
-        
-        performance_df = pd.DataFrame(performance_data)
-        performance_df = performance_df.round(4)
-        
-        # Display performance table
-        st.dataframe(performance_df, use_container_width=True)
-        
-        # Find best model
-        best_model_name = performance_df.loc[performance_df['F1 Score'].idxmax(), 'Model']
-        st.success(f"🏆 Best Model: {best_model_name}")
-        
-        # Performance metrics visualization
-        fig, axes = plt.subplots(2, 2, figsize=(15, 10))
-        
-        metrics = ['Accuracy', 'Precision', 'Recall', 'F1 Score']
-        for i, metric in enumerate(metrics):
-            ax = axes[i//2, i%2]
-            performance_df.plot(x='Model', y=metric, kind='bar', ax=ax, color='skyblue', legend=False)
-            ax.set_title(f'{metric} Comparison')
-            ax.set_ylabel(metric)
-            ax.tick_params(axis='x', rotation=45)
-        
-        plt.tight_layout()
-        st.pyplot(fig)
-        
-        # Confusion Matrix for Best Model
-        st.subheader(f"Confusion Matrix - {best_model_name}")
-        
-        best_results = st.session_state.model_performance[best_model_name]
-        cm = best_results['confusion_matrix']
-        
-        fig, ax = plt.subplots(figsize=(8, 6))
-        sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', ax=ax,
-                    xticklabels=['Rejected', 'Approved'],
-                    yticklabels=['Rejected', 'Approved'])
-        plt.title(f'Confusion Matrix - {best_model_name}')
-        plt.ylabel('True Label')
-        plt.xlabel('Predicted Label')
-        st.pyplot(fig)
-        
-        # Classification Report
-        st.subheader(f"Classification Report - {best_model_name}")
-        
-        y_test = best_results['y_test']
-        y_pred = best_results['y_pred']
-        
-        report = classification_report(y_test, y_pred, target_names=['Rejected', 'Approved'], output_dict=True)
-        report_df = pd.DataFrame(report).transpose()
-        st.dataframe(report_df.round(4))
-
 # Footer
 st.markdown("---")
 st.markdown(
