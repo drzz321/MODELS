@@ -46,8 +46,21 @@ page = st.sidebar.selectbox("Choose a page", ["Model Training"])
 
 # --- Flexible CSV structure: user selects target and categorical columns ---
 def preprocess_data(df, target_col, categorical_cols):
-    """Preprocess the data for training"""
+    """Preprocess the data for training, including missing value imputation"""
     df_processed = df.copy()
+    # Impute missing values
+    for col in df_processed.columns:
+        if col == target_col:
+            continue
+        if col in categorical_cols:
+            mode = df_processed[col].mode()
+            if not mode.empty:
+                df_processed[col] = df_processed[col].fillna(mode[0])
+            else:
+                df_processed[col] = df_processed[col].fillna('Unknown')
+        else:
+            median = df_processed[col].median()
+            df_processed[col] = df_processed[col].fillna(median)
     label_encoders = {}
     for col in categorical_cols:
         le = LabelEncoder()
