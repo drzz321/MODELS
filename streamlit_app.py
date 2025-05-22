@@ -73,6 +73,8 @@ def train_models(df, target_col, categorical_cols):
     X = df_processed.drop(target_col, axis=1)
     y = df_processed[target_col]
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42, stratify=y)
+    # Store X_train in session_state for scaling during prediction
+    st.session_state['X_train'] = X_train
     models = {
         "Random Forest": RandomForestClassifier(n_estimators=100, random_state=42),
         "Logistic Regression": LogisticRegression(random_state=42, max_iter=5000),
@@ -164,6 +166,7 @@ if page == "Model Training":
                     st.session_state.model_trained = True
                     st.session_state.target_col = target_col
                     st.session_state.categorical_cols = categorical_cols
+                    st.session_state.X_train = df.drop(target_col, axis=1)
                     st.success("✅ Models trained successfully!")
                     # Model performance for all models
                     st.subheader("Model Performance (All Models)")
@@ -206,6 +209,22 @@ if page == "Model Training":
             st.error("Please provide training data and select target column.")
     if st.session_state.model_trained:
         st.success("✅ Models are ready for prediction!")
+        # Show best model performance metrics and confusion matrix after training
+        best_model_name = max(st.session_state.model_performance.keys(), key=lambda k: st.session_state.model_performance[k]['f1'])
+        best_results = st.session_state.model_performance[best_model_name]
+        st.subheader(f"Best Model: {best_model_name}")
+        st.write(f"**Accuracy:** {best_results['accuracy']:.4f}")
+        st.write(f"**Precision:** {best_results['precision']:.4f}")
+        st.write(f"**Recall:** {best_results['recall']:.4f}")
+        st.write(f"**F1 Score:** {best_results['f1']:.4f}")
+        st.markdown("**Confusion Matrix:**")
+        cm = best_results['confusion_matrix']
+        fig, ax = plt.subplots(figsize=(6, 4))
+        sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', ax=ax)
+        plt.title(f'Confusion Matrix - {best_model_name}')
+        plt.ylabel('True Label')
+        plt.xlabel('Predicted Label')
+        st.pyplot(fig)
 
 # --- Prediction Page ---
 if page == "Prediction":
@@ -242,6 +261,14 @@ if page == "Prediction":
             for col in categorical_cols:
                 le = label_encoders[col]
                 input_df[col] = le.transform([input_df[col][0]])
+            # Scale if best model is Logistic Regression
+            if best_model_name == "Logistic Regression":
+                scaler = StandardScaler()
+                # Fit scaler on training data (stored in session_state)
+                X_train = st.session_state.get('X_train')
+                if X_train is not None:
+                    scaler.fit(X_train)
+                    input_df = scaler.transform(input_df)
             pred = best_model.predict(input_df)[0]
             proba = None
             if hasattr(best_model, "predict_proba"):
@@ -267,6 +294,13 @@ if page == "Prediction":
                 for col in categorical_cols:
                     le = label_encoders[col]
                     batch_df[col] = le.transform(batch_df[col].astype(str))
+                # Scale if best model is Logistic Regression
+                if best_model_name == "Logistic Regression":
+                    scaler = StandardScaler()
+                    X_train = st.session_state.get('X_train')
+                    if X_train is not None:
+                        scaler.fit(X_train)
+                        batch_df[feature_names] = scaler.transform(batch_df[feature_names])
                 preds = best_model.predict(batch_df[feature_names])
                 proba = None
                 if hasattr(best_model, "predict_proba"):
@@ -283,7 +317,6 @@ if page == "Prediction":
                 b64 = base64.b64encode(csv.encode()).decode()
                 href = f'<a href="data:file/csv;base64,{b64}" download="predictions.csv">Download Predictions CSV</a>'
                 st.markdown(href, unsafe_allow_html=True)
-
 # Footer
 st.markdown("---")
 st.markdown(
