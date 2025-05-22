@@ -175,37 +175,27 @@ if page == "Model Training":
     with col1:
         st.subheader("Training Data")
         
-        option = st.radio("Choose data source:", ["Use Sample Data", "Upload CSV File"])
-        
-        if option == "Upload CSV File":
-            uploaded_file = st.file_uploader("Choose a CSV file", type="csv")
-            if uploaded_file is not None:
-                df = pd.read_csv(uploaded_file)
-                st.write("Uploaded data shape:", df.shape)
-                st.write(df.head())
-            else:
-                st.info("Please upload a CSV file to proceed with training.")
-                df = None
-        else:
-            df = load_sample_data()
-            st.write("Sample data shape:", df.shape)
+        # Only allow CSV upload, remove sample data option
+        uploaded_file = st.file_uploader("Upload your CSV file for training", type="csv")
+        if uploaded_file is not None:
+            df = pd.read_csv(uploaded_file)
+            st.write("Uploaded data shape:", df.shape)
             st.write(df.head())
-        
-        # # --- EDA Section ---
+        else:
+            st.info("Please upload a CSV file to proceed with training.")
+            df = None
+        # Optionally, you can add EDA here if df is not None
         # if df is not None:
         #     st.markdown("---")
         #     st.subheader("Exploratory Data Analysis (EDA)")
-        #     # Class balance
         #     st.markdown("**Class Balance:**")
         #     fig, ax = plt.subplots()
         #     sns.countplot(data=df, x='loan_status', ax=ax)
         #     ax.set_title('Class Distribution of loan_status')
         #     st.pyplot(fig)
-        #     # Feature types
         #     st.markdown("**Feature Types:**")
         #     st.write(df.dtypes.value_counts())
         #     st.write(df.dtypes)
-        #     # Missing data
         #     st.markdown("**Missing Data:**")
         #     missing = df.isnull().sum()
         #     st.write(missing[missing > 0] if missing.sum() > 0 else "No missing values.")
@@ -231,6 +221,19 @@ if page == "Model Training":
                         # Display best model info
                         best_model_name = max(model_results.keys(), key=lambda k: model_results[k]['f1'])
                         st.info(f"🏆 Best Model: {best_model_name} (F1 Score: {model_results[best_model_name]['f1']:.4f})")
+                        # Display accuracy and confusion matrix for best model
+                        st.markdown("**Accuracy:**")
+                        st.write(f"{model_results[best_model_name]['accuracy']:.4f}")
+                        st.markdown("**Confusion Matrix:**")
+                        cm = model_results[best_model_name]['confusion_matrix']
+                        fig, ax = plt.subplots(figsize=(6, 4))
+                        sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', ax=ax,
+                                    xticklabels=['Rejected', 'Approved'],
+                                    yticklabels=['Rejected', 'Approved'])
+                        plt.title(f'Confusion Matrix - {best_model_name}')
+                        plt.ylabel('True Label')
+                        plt.xlabel('Predicted Label')
+                        st.pyplot(fig)
                         # Feature importance (if Random Forest is best)
                         if best_model_name == "Random Forest":
                             st.markdown("**Feature Importances (Random Forest):**")
