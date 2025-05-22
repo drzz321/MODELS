@@ -286,6 +286,8 @@ if page == "Prediction":
                 b64 = base64.b64encode(csv.encode()).decode()
                 href = f'<a href="data:file/csv;base64,{b64}" download="predictions.csv">Download Predictions CSV</a>'
                 st.markdown(href, unsafe_allow_html=True)
+                if proba is not None:
+                    st.info("Each 'Prob_Class' column shows the model's confidence (from 0 to 1) that the row belongs to that class. For example, a value of 0.54 for 'Prob_1' means a 54% chance the row is class 1. The 'Prediction' column shows the most likely class for each row.")
 # Footer
 st.markdown("---")
 st.markdown(
