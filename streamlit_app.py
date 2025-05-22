@@ -17,6 +17,14 @@ import io
 import base64
 import os
 
+# Page configuration (must be first Streamlit command)
+st.set_page_config(
+    page_title="Loan Prediction App",
+    page_icon="💰",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
+
 # --- Load deployment artifacts ---
 DEPLOY_DIR = 'streamlit_deploy_artifacts'
 model_path = os.path.join(DEPLOY_DIR, 'best_model.joblib')
@@ -41,14 +49,6 @@ if os.path.exists(model_path):
     st.info('Loaded pre-trained Random Forest model and preprocessors.')
 else:
     st.warning('Pre-trained model not found. Please train a model first.')
-
-# Page configuration
-st.set_page_config(
-    page_title="Loan Prediction App",
-    page_icon="💰",
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
 
 # Custom CSS for better styling
 st.markdown("""
