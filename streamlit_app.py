@@ -124,21 +124,25 @@ if page == "Model Training":
     # User selects target column
     st.subheader("Step 2: Select Target and Categorical Columns")
     st.markdown("""
-    You can select the target and categorical columns using the dropdowns below, or if you prefer, you can type their names directly (comma-separated for categorical columns). If you use the text input, it will override the dropdown/multiselect selection.
+    **Method 1: Use the dropdowns below to select your columns.**
     """)
     # Dropdown for target column
     target_col_dropdown = st.selectbox("Select the target column (label)", df.columns)
-    # Text input for target column (optional, overrides dropdown if filled)
-    target_col_text = st.text_input("Or enter the target column name (optional, overrides dropdown)")
-    target_col = target_col_text.strip() if target_col_text.strip() else target_col_dropdown
-
     # Multiselect for categorical columns
     default_cats = list(df.select_dtypes(include=['object']).columns)
-    if target_col in default_cats:
-        default_cats.remove(target_col)
+    if target_col_dropdown in default_cats:
+        default_cats.remove(target_col_dropdown)
     categorical_cols_multiselect = st.multiselect("Select categorical columns", df.columns, default=default_cats)
+    st.markdown("---")
+    st.markdown("""
+    **Method 2: Or type the column names directly (comma-separated for categorical columns).**
+    If you use the text input, it will override the dropdown/multiselect selection above.
+    """)
+    # Text input for target column (optional, overrides dropdown if filled)
+    target_col_text = st.text_input("Enter the target column name (optional, overrides dropdown)")
+    target_col = target_col_text.strip() if target_col_text.strip() else target_col_dropdown
     # Text input for categorical columns (optional, overrides multiselect if filled)
-    cat_col_text = st.text_input("Or enter categorical column names (comma-separated, optional, overrides selection)")
+    cat_col_text = st.text_input("Enter categorical column names (comma-separated, optional, overrides selection)")
     if cat_col_text.strip():
         categorical_cols = [col.strip() for col in cat_col_text.split(',') if col.strip() in df.columns]
     else:
