@@ -37,7 +37,7 @@ if 'model_performance' not in st.session_state:
     st.session_state.model_performance = {}
 
 # Header
-st.markdown('<h1 class="main-header">Prediction System</h1>', unsafe_allow_html=True)
+st.markdown('<h1 class="main-header"> Prediction System</h1>', unsafe_allow_html=True)
 st.markdown("---")
 
 # Sidebar
@@ -77,7 +77,7 @@ def train_models(df, target_col, categorical_cols):
         "Random Forest": RandomForestClassifier(n_estimators=100, random_state=42),
         "Logistic Regression": LogisticRegression(random_state=42, max_iter=1000),
         "Decision Tree": DecisionTreeClassifier(random_state=42),
-        "SVM": SVC(probability=True, random_state=42),
+        "SVM": SVC(probability=False, random_state=42),
         "KNN": KNeighborsClassifier(),
         "Naive Bayes": GaussianNB()
     }
