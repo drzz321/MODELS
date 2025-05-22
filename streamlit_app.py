@@ -15,6 +15,32 @@ from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_sc
 import joblib
 import io
 import base64
+import os
+
+# --- Load deployment artifacts ---
+DEPLOY_DIR = 'streamlit_deploy_artifacts'
+model_path = os.path.join(DEPLOY_DIR, 'best_model.joblib')
+encoders_path = os.path.join(DEPLOY_DIR, 'label_encoders.joblib')
+columns_path = os.path.join(DEPLOY_DIR, 'X_train_columns.joblib')
+metrics_path = os.path.join(DEPLOY_DIR, 'performance_metrics.joblib')
+cmatrix_path = os.path.join(DEPLOY_DIR, 'confusion_matrix_data.joblib')
+
+# Load model and preprocessors if available
+if os.path.exists(model_path):
+    best_model = joblib.load(model_path)
+    label_encoders = joblib.load(encoders_path)
+    feature_names = joblib.load(columns_path)
+    performance_metrics = joblib.load(metrics_path)
+    confusion_matrix_data = joblib.load(cmatrix_path)
+    st.session_state.best_model = best_model
+    st.session_state.label_encoders = label_encoders
+    st.session_state.feature_names = feature_names
+    st.session_state.model_trained = True
+    st.session_state.performance_metrics = performance_metrics
+    st.session_state.confusion_matrix_data = confusion_matrix_data
+    st.info('Loaded pre-trained Random Forest model and preprocessors.')
+else:
+    st.warning('Pre-trained model not found. Please train a model first.')
 
 # Page configuration
 st.set_page_config(
@@ -76,41 +102,12 @@ st.markdown("---")
 st.sidebar.title("Navigation")
 page = st.sidebar.selectbox("Choose a page", ["Model Training", "Single Prediction", "Batch Prediction", "Model Performance"])
 
-# Sample data for demonstration (you should replace this with your actual training data)
+# Load actual dataset for demonstration and training
 @st.cache_data
 def load_sample_data():
-    """Load sample data for demonstration purposes"""
-    np.random.seed(42)
-    n_samples = 1000
-    
-    data = {
-        'loan_amnt': np.random.randint(1000, 50000, n_samples),
-        'term': np.random.choice([36, 60], n_samples),
-        'annual_inc': np.random.randint(20000, 150000, n_samples),
-        'dti': np.random.uniform(0, 40, n_samples),
-        'emp_length': np.random.randint(0, 11, n_samples),
-        'home_ownership': np.random.choice(['RENT', 'OWN', 'MORTGAGE'], n_samples),
-        'verification_status': np.random.choice(['Verified', 'Source Verified', 'Not Verified'], n_samples),
-        'purpose': np.random.choice(['debt_consolidation', 'credit_card', 'home_improvement', 'other'], n_samples),
-        'delinq_2yrs': np.random.randint(0, 5, n_samples),
-        'inq_last_6mths': np.random.randint(0, 10, n_samples),
-        'open_acc': np.random.randint(1, 25, n_samples),
-        'pub_rec': np.random.randint(0, 5, n_samples),
-        'revol_bal': np.random.randint(0, 100000, n_samples),
-        'revol_util': np.random.uniform(0, 100, n_samples),
-        'total_acc': np.random.randint(1, 50, n_samples),
-    }
-    
-    # Create loan_status based on some logic
-    loan_status = []
-    for i in range(n_samples):
-        # Simple logic for demonstration
-        risk_score = (data['dti'][i] / 40) + (data['delinq_2yrs'][i] / 5) - (data['annual_inc'][i] / 150000)
-        loan_status.append(1 if risk_score < 0.3 else 0)  # 1 = Approved, 0 = Rejected
-    
-    data['loan_status'] = loan_status
-    
-    return pd.DataFrame(data)
+    """Load actual loan data from Loans.csv for demonstration and training purposes"""
+    df = pd.read_csv('Loans.csv')
+    return df
 
 def preprocess_data(df):
     """Preprocess the data for training"""
@@ -193,6 +190,29 @@ if page == "Model Training":
             df = load_sample_data()
             st.write("Sample data shape:", df.shape)
             st.write(df.head())
+        
+        # --- EDA Section ---
+        if df is not None:
+            st.markdown("---")
+            st.subheader("Exploratory Data Analysis (EDA)")
+            # Class balance
+            st.markdown("**Class Balance:**")
+            fig, ax = plt.subplots()
+            sns.countplot(data=df, x='loan_status', ax=ax)
+            ax.set_title('Class Distribution of loan_status')
+            st.pyplot(fig)
+            # Feature types
+            st.markdown("**Feature Types:**")
+            st.write(df.dtypes.value_counts())
+            st.write(df.dtypes)
+            # Missing data
+            st.markdown("**Missing Data:**")
+            missing = df.isnull().sum()
+            st.write(missing[missing > 0] if missing.sum() > 0 else "No missing values.")
+            if missing.sum() > 0:
+                fig, ax = plt.subplots(figsize=(8, 2))
+                sns.heatmap(df.isnull(), cbar=False, yticklabels=False, ax=ax)
+                st.pyplot(fig)
     
     with col2:
         st.subheader("Training Controls")
@@ -202,19 +222,25 @@ if page == "Model Training":
                 with st.spinner("Training models... This may take a few minutes."):
                     try:
                         best_model, model_results, label_encoders, feature_names = train_models(df)
-                        
                         st.session_state.best_model = best_model
                         st.session_state.model_performance = model_results
                         st.session_state.label_encoders = label_encoders
                         st.session_state.feature_names = feature_names
                         st.session_state.model_trained = True
-                        
                         st.success("✅ Models trained successfully!")
-                        
                         # Display best model info
                         best_model_name = max(model_results.keys(), key=lambda k: model_results[k]['f1'])
                         st.info(f"🏆 Best Model: {best_model_name} (F1 Score: {model_results[best_model_name]['f1']:.4f})")
-                        
+                        # Feature importance (if Random Forest is best)
+                        if best_model_name == "Random Forest":
+                            st.markdown("**Feature Importances (Random Forest):**")
+                            importances = best_model.feature_importances_
+                            feat_df = pd.DataFrame({'Feature': feature_names, 'Importance': importances})
+                            feat_df = feat_df.sort_values(by='Importance', ascending=False)
+                            fig, ax = plt.subplots(figsize=(8, 5))
+                            sns.barplot(x='Importance', y='Feature', data=feat_df, ax=ax)
+                            ax.set_title('Random Forest - Feature Importances')
+                            st.pyplot(fig)
                     except Exception as e:
                         st.error(f"Error during training: {str(e)}")
             else:
@@ -384,6 +410,21 @@ elif page == "Model Performance":
     if not st.session_state.model_trained:
         st.warning("⚠️ Please train the models first in the 'Model Training' page.")
     else:
+        st.subheader("Random Forest Model Performance (from training script)")
+        if hasattr(st.session_state, 'performance_metrics'):
+            metrics = st.session_state.performance_metrics
+            st.write(pd.DataFrame([metrics]))
+        if hasattr(st.session_state, 'confusion_matrix_data'):
+            cm = st.session_state.confusion_matrix_data
+            fig, ax = plt.subplots(figsize=(6, 4))
+            sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', ax=ax,
+                        xticklabels=['Rejected', 'Approved'],
+                        yticklabels=['Rejected', 'Approved'])
+            plt.title('Confusion Matrix (Random Forest)')
+            plt.ylabel('True Label')
+            plt.xlabel('Predicted Label')
+            st.pyplot(fig)
+        
         st.subheader("Model Comparison")
         
         # Create performance comparison dataframe
