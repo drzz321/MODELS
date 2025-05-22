@@ -191,28 +191,28 @@ if page == "Model Training":
             st.write("Sample data shape:", df.shape)
             st.write(df.head())
         
-        # --- EDA Section ---
-        if df is not None:
-            st.markdown("---")
-            st.subheader("Exploratory Data Analysis (EDA)")
-            # Class balance
-            st.markdown("**Class Balance:**")
-            fig, ax = plt.subplots()
-            sns.countplot(data=df, x='loan_status', ax=ax)
-            ax.set_title('Class Distribution of loan_status')
-            st.pyplot(fig)
-            # Feature types
-            st.markdown("**Feature Types:**")
-            st.write(df.dtypes.value_counts())
-            st.write(df.dtypes)
-            # Missing data
-            st.markdown("**Missing Data:**")
-            missing = df.isnull().sum()
-            st.write(missing[missing > 0] if missing.sum() > 0 else "No missing values.")
-            if missing.sum() > 0:
-                fig, ax = plt.subplots(figsize=(8, 2))
-                sns.heatmap(df.isnull(), cbar=False, yticklabels=False, ax=ax)
-                st.pyplot(fig)
+        # # --- EDA Section ---
+        # if df is not None:
+        #     st.markdown("---")
+        #     st.subheader("Exploratory Data Analysis (EDA)")
+        #     # Class balance
+        #     st.markdown("**Class Balance:**")
+        #     fig, ax = plt.subplots()
+        #     sns.countplot(data=df, x='loan_status', ax=ax)
+        #     ax.set_title('Class Distribution of loan_status')
+        #     st.pyplot(fig)
+        #     # Feature types
+        #     st.markdown("**Feature Types:**")
+        #     st.write(df.dtypes.value_counts())
+        #     st.write(df.dtypes)
+        #     # Missing data
+        #     st.markdown("**Missing Data:**")
+        #     missing = df.isnull().sum()
+        #     st.write(missing[missing > 0] if missing.sum() > 0 else "No missing values.")
+        #     if missing.sum() > 0:
+        #         fig, ax = plt.subplots(figsize=(8, 2))
+        #         sns.heatmap(df.isnull(), cbar=False, yticklabels=False, ax=ax)
+        #         st.pyplot(fig)
     
     with col2:
         st.subheader("Training Controls")
