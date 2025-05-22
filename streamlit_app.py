@@ -89,122 +89,118 @@ def train_models(df, target_col, categorical_cols):
 # Page 1: Model Training
 if page == "Model Training":
     st.header("🔧 Model Training")
-    col1, col2 = st.columns([2, 1])
-    with col1:
-        st.subheader("Training Data")
-        st.info("Upload any CSV file for classification. Select your target and categorical columns.")
-        uploaded_file = st.file_uploader("Upload your CSV file for training", type="csv")
-        if uploaded_file is not None:
-            df = pd.read_csv(uploaded_file)
-            st.write("Uploaded data shape:", df.shape)
-            st.write(df.head())
-            # User selects target column
-            target_col = st.selectbox("Select the target column (label)", df.columns)
-            # User selects categorical columns
-            default_cats = list(df.select_dtypes(include=['object']).columns)
-            if target_col in default_cats:
-                default_cats.remove(target_col)
-            categorical_cols = st.multiselect("Select categorical columns", df.columns, default=default_cats)
-            # --- User can manually input a row for prediction before training ---
-            st.markdown("---")
-            st.subheader("Manual Input Example (Optional)")
-            st.info("You can manually input feature values below to see how a sample row would look. This does not make a prediction until after training.")
-            manual_input = {}
-            for col in df.columns:
-                if col == target_col:
-                    continue
-                if col in categorical_cols:
-                    options = df[col].unique().tolist()
-                    manual_input[col] = st.selectbox(f"{col}", options, key=f"manual_{col}")
-                else:
-                    manual_input[col] = st.number_input(f"{col}", key=f"manual_{col}")
-            st.write("Your manual input as a DataFrame:")
-            st.write(pd.DataFrame([manual_input]))
+    # --- Always show CSV upload at the top ---
+    st.subheader("Step 1: Upload Your CSV File")
+    uploaded_file = st.file_uploader("Upload your CSV file for training (required)", type="csv", key="main_csv_upload")
+    if uploaded_file is None:
+        st.warning("Please upload a CSV file to proceed. The rest of the options will appear after upload.")
+        st.stop()
+    # --- After upload, show the rest of the UI ---
+    df = pd.read_csv(uploaded_file)
+    st.write("Uploaded data shape:", df.shape)
+    st.write(df.head())
+    # User selects target column
+    st.subheader("Step 2: Select Target and Categorical Columns")
+    target_col = st.selectbox("Select the target column (label)", df.columns)
+    default_cats = list(df.select_dtypes(include=['object']).columns)
+    if target_col in default_cats:
+        default_cats.remove(target_col)
+    categorical_cols = st.multiselect("Select categorical columns", df.columns, default=default_cats)
+    # Manual input preview
+    st.markdown("---")
+    st.subheader("Step 3: Manual Input Example (Optional)")
+    st.info("You can manually input feature values below to see how a sample row would look. This does not make a prediction until after training.")
+    manual_input = {}
+    for col in df.columns:
+        if col == target_col:
+            continue
+        if col in categorical_cols:
+            options = df[col].unique().tolist()
+            manual_input[col] = st.selectbox(f"{col}", options, key=f"manual_{col}")
         else:
-            st.warning("Please upload a CSV file to proceed with training.")
-            df = None
-            target_col = None
-            categorical_cols = []
-    with col2:
-        st.subheader("Training Controls")
-        if st.button("🚀 Train Models", type="primary"):
-            if df is not None and target_col is not None:
-                with st.spinner("Training models... This may take a few minutes."):
-                    try:
-                        best_model, model_results, label_encoders, feature_names, best_model_name = train_models(df, target_col, categorical_cols)
-                        st.session_state.best_model = best_model
-                        st.session_state.model_performance = model_results
-                        st.session_state.label_encoders = label_encoders
-                        st.session_state.feature_names = feature_names
-                        st.session_state.model_trained = True
-                        st.session_state.target_col = target_col
-                        st.session_state.categorical_cols = categorical_cols
-                        st.success("✅ Models trained successfully!")
-                        # Model performance for all models
-                        st.subheader("Model Performance (All Models)")
-                        performance_data = []
-                        for model_name, results in model_results.items():
-                            performance_data.append({
-                                'Model': model_name,
-                                'Accuracy': results['accuracy'],
-                                'Precision': results['precision'],
-                                'Recall': results['recall'],
-                                'F1 Score': results['f1']
-                            })
-                        performance_df = pd.DataFrame(performance_data)
-                        performance_df = performance_df.round(4)
-                        st.dataframe(performance_df, use_container_width=True)
-                        # Best model info
-                        st.info(f"🏆 Best Model: {best_model_name} (F1 Score: {model_results[best_model_name]['f1']:.4f})")
-                        st.markdown("**Accuracy:**")
-                        st.write(f"{model_results[best_model_name]['accuracy']:.4f}")
-                        st.markdown("**Confusion Matrix:**")
-                        cm = model_results[best_model_name]['confusion_matrix']
-                        fig, ax = plt.subplots(figsize=(6, 4))
-                        sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', ax=ax)
-                        plt.title(f'Confusion Matrix - {best_model_name}')
-                        plt.ylabel('True Label')
-                        plt.xlabel('Predicted Label')
+            manual_input[col] = st.number_input(f"{col}", key=f"manual_{col}")
+    st.write("Your manual input as a DataFrame:")
+    st.write(pd.DataFrame([manual_input]))
+    # Training controls
+    st.subheader("Training Controls")
+    if st.button("🚀 Train Models", type="primary"):
+        if df is not None and target_col is not None:
+            with st.spinner("Training models... This may take a few minutes."):
+                try:
+                    best_model, model_results, label_encoders, feature_names, best_model_name = train_models(df, target_col, categorical_cols)
+                    st.session_state.best_model = best_model
+                    st.session_state.model_performance = model_results
+                    st.session_state.label_encoders = label_encoders
+                    st.session_state.feature_names = feature_names
+                    st.session_state.model_trained = True
+                    st.session_state.target_col = target_col
+                    st.session_state.categorical_cols = categorical_cols
+                    st.success("✅ Models trained successfully!")
+                    # Model performance for all models
+                    st.subheader("Model Performance (All Models)")
+                    performance_data = []
+                    for model_name, results in model_results.items():
+                        performance_data.append({
+                            'Model': model_name,
+                            'Accuracy': results['accuracy'],
+                            'Precision': results['precision'],
+                            'Recall': results['recall'],
+                            'F1 Score': results['f1']
+                        })
+                    performance_df = pd.DataFrame(performance_data)
+                    performance_df = performance_df.round(4)
+                    st.dataframe(performance_df, use_container_width=True)
+                    # Best model info
+                    st.info(f"🏆 Best Model: {best_model_name} (F1 Score: {model_results[best_model_name]['f1']:.4f})")
+                    st.markdown("**Accuracy:**")
+                    st.write(f"{model_results[best_model_name]['accuracy']:.4f}")
+                    st.markdown("**Confusion Matrix:**")
+                    cm = model_results[best_model_name]['confusion_matrix']
+                    fig, ax = plt.subplots(figsize=(6, 4))
+                    sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', ax=ax)
+                    plt.title(f'Confusion Matrix - {best_model_name}')
+                    plt.ylabel('True Label')
+                    plt.xlabel('Predicted Label')
+                    st.pyplot(fig)
+                    if best_model_name == "Random Forest":
+                        st.markdown("**Feature Importances (Random Forest):**")
+                        importances = best_model.feature_importances_
+                        feat_df = pd.DataFrame({'Feature': feature_names, 'Importance': importances})
+                        feat_df = feat_df.sort_values(by='Importance', ascending=False)
+                        fig, ax = plt.subplots(figsize=(8, 5))
+                        sns.barplot(x='Importance', y='Feature', data=feat_df, ax=ax)
+                        ax.set_title('Random Forest - Feature Importances')
                         st.pyplot(fig)
-                        if best_model_name == "Random Forest":
-                            st.markdown("**Feature Importances (Random Forest):**")
-                            importances = best_model.feature_importances_
-                            feat_df = pd.DataFrame({'Feature': feature_names, 'Importance': importances})
-                            feat_df = feat_df.sort_values(by='Importance', ascending=False)
-                            fig, ax = plt.subplots(figsize=(8, 5))
-                            sns.barplot(x='Importance', y='Feature', data=feat_df, ax=ax)
-                            ax.set_title('Random Forest - Feature Importances')
-                            st.pyplot(fig)
-                        # --- User Input for Prediction ---
-                        st.subheader("Try a Prediction with Your Model")
-                        st.info("Enter feature values below to see a prediction from the best model.")
-                        input_data = {}
-                        for col in feature_names:
-                            if col in categorical_cols:
-                                le = label_encoders[col]
-                                options = list(le.classes_)
-                                input_data[col] = st.selectbox(f"{col}", options, key=f"input_{col}")
-                            else:
-                                input_data[col] = st.number_input(f"{col}", key=f"input_{col}")
-                        if st.button("Predict with Best Model"):
-                            input_df = pd.DataFrame([input_data])
-                            for col in categorical_cols:
-                                le = label_encoders[col]
-                                try:
-                                    input_df[col] = le.transform(input_df[col])
-                                except Exception:
-                                    input_df[col] = 0
-                            input_df = input_df.reindex(columns=feature_names, fill_value=0)
-                            prediction = best_model.predict(input_df)[0]
-                            prediction_proba = best_model.predict_proba(input_df)[0] if hasattr(best_model, 'predict_proba') else None
-                            st.markdown(f"**Predicted Class:** `{prediction}`")
-                            if prediction_proba is not None:
-                                st.write("Class Probabilities:")
-                                st.write(dict(zip(best_model.classes_, prediction_proba)))
-                    except Exception as e:
-                        st.error(f"Error during training: {str(e)}")
-            else:
-                st.error("Please provide training data and select target column.")
+                    # --- User Input for Prediction ---
+                    st.subheader("Try a Prediction with Your Model")
+                    st.info("Enter feature values below to see a prediction from the best model.")
+                    input_data = {}
+                    for col in feature_names:
+                        if col in categorical_cols:
+                            le = label_encoders[col]
+                            options = list(le.classes_)
+                            input_data[col] = st.selectbox(f"{col}", options, key=f"input_{col}")
+                        else:
+                            input_data[col] = st.number_input(f"{col}", key=f"input_{col}")
+                    if st.button("Predict with Best Model"):
+                        input_df = pd.DataFrame([input_data])
+                        for col in categorical_cols:
+                            le = label_encoders[col]
+                            try:
+                                input_df[col] = le.transform(input_df[col])
+                            except Exception:
+                                input_df[col] = 0
+                        input_df = input_df.reindex(columns=feature_names, fill_value=0)
+                        prediction = best_model.predict(input_df)[0]
+                        prediction_proba = best_model.predict_proba(input_df)[0] if hasattr(best_model, 'predict_proba') else None
+                        st.markdown(f"**Predicted Class:** `{prediction}`")
+                        if prediction_proba is not None:
+                            st.write("Class Probabilities:")
+                            st.write(dict(zip(best_model.classes_, prediction_proba)))
+                except Exception as e:
+                    st.error(f"Error during training: {str(e)}")
+        else:
+            st.error("Please provide training data and select target column.")
     if st.session_state.model_trained:
         st.success("✅ Models are ready for prediction!")
 
