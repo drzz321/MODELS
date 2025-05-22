@@ -20,7 +20,7 @@ import os
 # Page configuration (must be first Streamlit command)
 st.set_page_config(
     page_title="Prediction App",
-    page_icon="🔮",  # Example: Crystal Ball emoji
+    page_icon="💰",
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -37,12 +37,12 @@ if 'model_performance' not in st.session_state:
     st.session_state.model_performance = {}
 
 # Header
-st.markdown('<h1 class="main-header">🔮 Prediction App</h1>', unsafe_allow_html=True)
+st.markdown('<h1 class="main-header">💰 Loan Prediction System</h1>', unsafe_allow_html=True)
 st.markdown("---")
 
 # Sidebar
 st.sidebar.title("Navigation")
-page = st.sidebar.selectbox("Choose a page", ["Model Training", "Single Prediction", "Batch Prediction", "Model Performance"])
+page = st.sidebar.selectbox("Choose a page", ["Model Training"])
 
 # --- Flexible CSV structure: user selects target and categorical columns ---
 def preprocess_data(df, target_col, categorical_cols):
@@ -125,6 +125,21 @@ if page == "Model Training":
                         st.session_state.target_col = target_col
                         st.session_state.categorical_cols = categorical_cols
                         st.success("✅ Models trained successfully!")
+                        # Model performance for all models
+                        st.subheader("Model Performance (All Models)")
+                        performance_data = []
+                        for model_name, results in model_results.items():
+                            performance_data.append({
+                                'Model': model_name,
+                                'Accuracy': results['accuracy'],
+                                'Precision': results['precision'],
+                                'Recall': results['recall'],
+                                'F1 Score': results['f1']
+                            })
+                        performance_df = pd.DataFrame(performance_data)
+                        performance_df = performance_df.round(4)
+                        st.dataframe(performance_df, use_container_width=True)
+                        # Best model info
                         st.info(f"🏆 Best Model: {best_model_name} (F1 Score: {model_results[best_model_name]['f1']:.4f})")
                         st.markdown("**Accuracy:**")
                         st.write(f"{model_results[best_model_name]['accuracy']:.4f}")
@@ -152,88 +167,6 @@ if page == "Model Training":
     if st.session_state.model_trained:
         st.success("✅ Models are ready for prediction!")
 
-# Page 2: Single Prediction
-elif page == "Single Prediction":
-    st.header("🎯 Single Prediction")
-    if not st.session_state.model_trained:
-        st.warning("⚠️ Please train the models first in the 'Model Training' page.")
-    else:
-        st.subheader("Enter Feature Values for Prediction")
-        input_data = {}
-        for col in st.session_state.feature_names:
-            if col in st.session_state.categorical_cols:
-                le = st.session_state.label_encoders[col]
-                options = list(le.classes_)
-                input_data[col] = st.selectbox(f"{col}", options)
-            else:
-                input_data[col] = st.number_input(f"{col}")
-        if st.button("🔮 Predict", type="primary"):
-            input_df = pd.DataFrame([input_data])
-            for col in st.session_state.categorical_cols:
-                le = st.session_state.label_encoders[col]
-                try:
-                    input_df[col] = le.transform(input_df[col])
-                except Exception:
-                    input_df[col] = 0
-            input_df = input_df.reindex(columns=st.session_state.feature_names, fill_value=0)
-            prediction = st.session_state.best_model.predict(input_df)[0]
-            prediction_proba = st.session_state.best_model.predict_proba(input_df)[0] if hasattr(st.session_state.best_model, 'predict_proba') else None
-            st.markdown(f"**Predicted Class:** `{prediction}`")
-            if prediction_proba is not None:
-                st.write("Class Probabilities:")
-                st.write(dict(zip(st.session_state.best_model.classes_, prediction_proba)))
-
-# Page 3: Batch Prediction
-elif page == "Batch Prediction":
-    st.header("📊 Batch Prediction")
-    if not st.session_state.model_trained:
-        st.warning("⚠️ Please train the models first in the 'Model Training' page.")
-    else:
-        st.subheader("Upload CSV File for Batch Prediction")
-        uploaded_file = st.file_uploader("Choose a CSV file", type="csv", key="batch_upload")
-        if uploaded_file is not None:
-            batch_df = pd.read_csv(uploaded_file)
-            st.write("Uploaded data shape:", batch_df.shape)
-            st.write("Preview of uploaded data:")
-            st.write(batch_df.head())
-            if st.button("🔮 Make Batch Predictions", type="primary"):
-                try:
-                    batch_processed = batch_df.copy()
-                    for col in st.session_state.categorical_cols:
-                        if col in batch_processed.columns and col in st.session_state.label_encoders:
-                            le = st.session_state.label_encoders[col]
-                            try:
-                                batch_processed[col] = le.transform(batch_processed[col].astype(str))
-                            except Exception:
-                                batch_processed[col] = 0
-                    if st.session_state.target_col in batch_processed.columns:
-                        batch_processed = batch_processed.drop(columns=[st.session_state.target_col])
-                    batch_processed = batch_processed.reindex(columns=st.session_state.feature_names, fill_value=0)
-                    predictions = st.session_state.best_model.predict(batch_processed)
-                    result_df = batch_df.copy()
-                    result_df['Predicted_Class'] = predictions
-                    st.subheader("Prediction Results")
-                    st.write(result_df)
-                    col1, col2 = st.columns(2)
-                    with col1:
-                        st.metric("Total Samples", len(result_df))
-                    with col2:
-                        st.metric("Unique Predicted Classes", len(set(predictions)))
-                    csv = result_df.to_csv(index=False)
-                    st.download_button(
-                        label="📥 Download Results as CSV",
-                        data=csv,
-                        file_name="predictions.csv",
-                        mime="text/csv"
-                    )
-                    fig, ax = plt.subplots(figsize=(8, 6))
-                    result_df['Predicted_Class'].value_counts().plot(kind='bar', ax=ax)
-                    plt.title('Batch Prediction Results')
-                    plt.ylabel('Count')
-                    plt.xticks(rotation=0)
-                    st.pyplot(fig)
-                except Exception as e:
-                    st.error(f"Error during batch prediction: {str(e)}")
 # Footer
 st.markdown("---")
 st.markdown(
