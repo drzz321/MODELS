@@ -123,19 +123,30 @@ if page == "Model Training":
     st.write(df.head())
     # User selects target column
     st.subheader("Step 2: Select Target and Categorical Columns")
-    target_col = st.selectbox("Select the target column (label)", df.columns)
-    # Warn if any class has <2 samples
-    class_counts = df[target_col].value_counts()
-    if (class_counts < 2).any():
-        st.error(f"The selected target column contains at least one class with fewer than 2 samples. Please check your data or choose a different target column.\nClass counts:\n{class_counts.to_string()}")
-        st.stop()
+    st.markdown("""
+    You can select the target and categorical columns using the dropdowns below, or if you prefer, you can type their names directly (comma-separated for categorical columns). If you use the text input, it will override the dropdown/multiselect selection.
+    """)
+    # Dropdown for target column
+    target_col_dropdown = st.selectbox("Select the target column (label)", df.columns)
+    # Text input for target column (optional, overrides dropdown if filled)
+    target_col_text = st.text_input("Or enter the target column name (optional, overrides dropdown)")
+    target_col = target_col_text.strip() if target_col_text.strip() else target_col_dropdown
+
+    # Multiselect for categorical columns
     default_cats = list(df.select_dtypes(include=['object']).columns)
     if target_col in default_cats:
         default_cats.remove(target_col)
-    categorical_cols = st.multiselect("Select categorical columns", df.columns, default=default_cats)
+    categorical_cols_multiselect = st.multiselect("Select categorical columns", df.columns, default=default_cats)
+    # Text input for categorical columns (optional, overrides multiselect if filled)
+    cat_col_text = st.text_input("Or enter categorical column names (comma-separated, optional, overrides selection)")
+    if cat_col_text.strip():
+        categorical_cols = [col.strip() for col in cat_col_text.split(',') if col.strip() in df.columns]
+    else:
+        categorical_cols = categorical_cols_multiselect
     # Training controls
     st.subheader("Training Controls")
     # Only enable training if all classes have at least 2 samples
+    class_counts = df[target_col].value_counts()
     can_train = (class_counts >= 2).all()
     if not can_train:
         st.warning("Training is disabled because at least one class in your target column has fewer than 2 samples.")
