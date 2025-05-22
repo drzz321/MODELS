@@ -42,7 +42,8 @@ st.markdown("---")
 
 # Sidebar
 st.sidebar.title("Navigation")
-page = st.sidebar.selectbox("Choose a page", ["Model Training", "Prediction"])
+page = st.sidebar.selectbox("Choose a page", ["Model Training"])
+# page = st.sidebar.selectbox("Choose a page", ["Model Training", "Prediction"])
 
 # --- Flexible CSV structure: user selects target and categorical columns ---
 def preprocess_data(df, target_col, categorical_cols):
@@ -210,99 +211,99 @@ if page == "Model Training":
     if st.session_state.model_trained:
         st.success("✅ Models are ready for prediction!")
 
-# --- Prediction Page ---
-if page == "Prediction":
-    st.header("🔮 Prediction")
-    if not st.session_state.get("model_trained", False):
-        st.warning("Please train a model first on the 'Model Training' page.")
-        st.stop()
-    best_model = st.session_state.best_model
-    label_encoders = st.session_state.label_encoders
-    feature_names = st.session_state.feature_names
-    target_col = st.session_state.target_col
-    categorical_cols = st.session_state.categorical_cols
-    best_model_name = None
-    for name, res in st.session_state.model_performance.items():
-        if res['model'] == best_model:
-            best_model_name = name
-            break
-    st.info(f"Using best model: {best_model_name}")
-    st.markdown(f"**F1 Score:** {st.session_state.model_performance[best_model_name]['f1']:.4f}")
-    st.markdown("---")
-    pred_mode = st.radio("Choose prediction mode", ["Manual Input", "Batch CSV Upload"])
-    if pred_mode == "Manual Input":
-        st.subheader("Manual Input Prediction")
-        manual_input = {}
-        for col in feature_names:
-            if col in categorical_cols:
-                options = label_encoders[col].classes_.tolist()
-                manual_input[col] = st.selectbox(f"{col}", options, key=f"pred_manual_{col}")
-            else:
-                manual_input[col] = st.number_input(f"{col}", key=f"pred_manual_{col}")
-        if st.button("Predict", key="manual_predict_btn"):
-            input_df = pd.DataFrame([manual_input])
-            # Encode categorical columns
-            for col in categorical_cols:
-                le = label_encoders[col]
-                input_df[col] = le.transform([input_df[col][0]])
-            # Scale if best model is Logistic Regression
-            if best_model_name == "Logistic Regression":
-                scaler = StandardScaler()
-                # Fit scaler on training data (stored in session_state)
-                X_train = st.session_state.get('X_train')
-                if X_train is not None:
-                    scaler.fit(X_train)
-                    input_df = scaler.transform(input_df)
-            pred = best_model.predict(input_df)[0]
-            proba = None
-            if hasattr(best_model, "predict_proba"):
-                proba = best_model.predict_proba(input_df)[0]
-            st.success(f"Prediction: {pred}")
-            if proba is not None:
-                st.write("Prediction Probabilities:")
-                class_labels = best_model.classes_
-                st.write({str(label): float(p) for label, p in zip(class_labels, proba)})
-    else:
-        st.subheader("Batch Prediction (CSV Upload)")
-        batch_file = st.file_uploader("Upload CSV for batch prediction", type="csv", key="batch_pred_upload")
-        if batch_file is not None:
-            batch_df = pd.read_csv(batch_file)
-            st.write("Uploaded batch data shape:", batch_df.shape)
-            st.write(batch_df.head())
-            # Check columns
-            missing_cols = [col for col in feature_names if col not in batch_df.columns]
-            if missing_cols:
-                st.error(f"Missing columns in uploaded file: {missing_cols}")
-            else:
-                # Encode categorical columns
-                for col in categorical_cols:
-                    le = label_encoders[col]
-                    batch_df[col] = le.transform(batch_df[col].astype(str))
-                # Scale if best model is Logistic Regression
-                if best_model_name == "Logistic Regression":
-                    scaler = StandardScaler()
-                    X_train = st.session_state.get('X_train')
-                    if X_train is not None:
-                        scaler.fit(X_train)
-                        batch_df[feature_names] = scaler.transform(batch_df[feature_names])
-                preds = best_model.predict(batch_df[feature_names])
-                proba = None
-                if hasattr(best_model, "predict_proba"):
-                    proba = best_model.predict_proba(batch_df[feature_names])
-                result_df = batch_df.copy()
-                result_df['Prediction'] = preds
-                if proba is not None:
-                    for idx, class_label in enumerate(best_model.classes_):
-                        result_df[f'Prob_{class_label}'] = proba[:, idx]
-                st.write("Predictions:")
-                st.dataframe(result_df, use_container_width=True)
-                # Download link
-                csv = result_df.to_csv(index=False)
-                b64 = base64.b64encode(csv.encode()).decode()
-                href = f'<a href="data:file/csv;base64,{b64}" download="predictions.csv">Download Predictions CSV</a>'
-                st.markdown(href, unsafe_allow_html=True)
-                if proba is not None:
-                    st.info("Each 'Prob_Class' column shows the model's confidence (from 0 to 1) that the row belongs to that class. For example, a value of 0.54 for 'Prob_1' means a 54% chance the row is class 1. The 'Prediction' column shows the most likely class for each row.")
+# # --- Prediction Page ---
+# if page == "Prediction":
+#     st.header("🔮 Prediction")
+#     if not st.session_state.get("model_trained", False):
+#         st.warning("Please train a model first on the 'Model Training' page.")
+#         st.stop()
+#     best_model = st.session_state.best_model
+#     label_encoders = st.session_state.label_encoders
+#     feature_names = st.session_state.feature_names
+#     target_col = st.session_state.target_col
+#     categorical_cols = st.session_state.categorical_cols
+#     best_model_name = None
+#     for name, res in st.session_state.model_performance.items():
+#         if res['model'] == best_model:
+#             best_model_name = name
+#             break
+#     st.info(f"Using best model: {best_model_name}")
+#     st.markdown(f"**F1 Score:** {st.session_state.model_performance[best_model_name]['f1']:.4f}")
+#     st.markdown("---")
+#     pred_mode = st.radio("Choose prediction mode", ["Manual Input", "Batch CSV Upload"])
+#     if pred_mode == "Manual Input":
+#         st.subheader("Manual Input Prediction")
+#         manual_input = {}
+#         for col in feature_names:
+#             if col in categorical_cols:
+#                 options = label_encoders[col].classes_.tolist()
+#                 manual_input[col] = st.selectbox(f"{col}", options, key=f"pred_manual_{col}")
+#             else:
+#                 manual_input[col] = st.number_input(f"{col}", key=f"pred_manual_{col}")
+#         if st.button("Predict", key="manual_predict_btn"):
+#             input_df = pd.DataFrame([manual_input])
+#             # Encode categorical columns
+#             for col in categorical_cols:
+#                 le = label_encoders[col]
+#                 input_df[col] = le.transform([input_df[col][0]])
+#             # Scale if best model is Logistic Regression
+#             if best_model_name == "Logistic Regression":
+#                 scaler = StandardScaler()
+#                 # Fit scaler on training data (stored in session_state)
+#                 X_train = st.session_state.get('X_train')
+#                 if X_train is not None:
+#                     scaler.fit(X_train)
+#                     input_df = scaler.transform(input_df)
+#             pred = best_model.predict(input_df)[0]
+#             proba = None
+#             if hasattr(best_model, "predict_proba"):
+#                 proba = best_model.predict_proba(input_df)[0]
+#             st.success(f"Prediction: {pred}")
+#             if proba is not None:
+#                 st.write("Prediction Probabilities:")
+#                 class_labels = best_model.classes_
+#                 st.write({str(label): float(p) for label, p in zip(class_labels, proba)})
+#     else:
+#         st.subheader("Batch Prediction (CSV Upload)")
+#         batch_file = st.file_uploader("Upload CSV for batch prediction", type="csv", key="batch_pred_upload")
+#         if batch_file is not None:
+#             batch_df = pd.read_csv(batch_file)
+#             st.write("Uploaded batch data shape:", batch_df.shape)
+#             st.write(batch_df.head())
+#             # Check columns
+#             missing_cols = [col for col in feature_names if col not in batch_df.columns]
+#             if missing_cols:
+#                 st.error(f"Missing columns in uploaded file: {missing_cols}")
+#             else:
+#                 # Encode categorical columns
+#                 for col in categorical_cols:
+#                     le = label_encoders[col]
+#                     batch_df[col] = le.transform(batch_df[col].astype(str))
+#                 # Scale if best model is Logistic Regression
+#                 if best_model_name == "Logistic Regression":
+#                     scaler = StandardScaler()
+#                     X_train = st.session_state.get('X_train')
+#                     if X_train is not None:
+#                         scaler.fit(X_train)
+#                         batch_df[feature_names] = scaler.transform(batch_df[feature_names])
+#                 preds = best_model.predict(batch_df[feature_names])
+#                 proba = None
+#                 if hasattr(best_model, "predict_proba"):
+#                     proba = best_model.predict_proba(batch_df[feature_names])
+#                 result_df = batch_df.copy()
+#                 result_df['Prediction'] = preds
+#                 if proba is not None:
+#                     for idx, class_label in enumerate(best_model.classes_):
+#                         result_df[f'Prob_{class_label}'] = proba[:, idx]
+#                 st.write("Predictions:")
+#                 st.dataframe(result_df, use_container_width=True)
+#                 # Download link
+#                 csv = result_df.to_csv(index=False)
+#                 b64 = base64.b64encode(csv.encode()).decode()
+#                 href = f'<a href="data:file/csv;base64,{b64}" download="predictions.csv">Download Predictions CSV</a>'
+#                 st.markdown(href, unsafe_allow_html=True)
+#                 if proba is not None:
+#                     st.info("Each 'Prob_Class' column shows the model's confidence (from 0 to 1) that the row belongs to that class. For example, a value of 0.54 for 'Prob_1' means a 54% chance the row is class 1. The 'Prediction' column shows the most likely class for each row.")
 # Footer
 st.markdown("---")
 st.markdown(
