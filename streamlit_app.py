@@ -109,6 +109,18 @@ def train_models(df, target_col, categorical_cols):
     best_model = model_results[best_model_name]['model']
     return best_model, model_results, label_encoders, X.columns.tolist(), best_model_name
 
+# Set custom background color to white
+st.markdown(
+    """
+    <style>
+    body, .main, .block-container, .stApp {
+        background-color: #fff !important;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+
 # Page 1: Model Training
 if page == "Model Training":
     st.header("🔧 Model Training")
