@@ -258,6 +258,10 @@ if page == "Prediction":
             if hasattr(best_model, "predict_proba"):
                 proba = best_model.predict_proba(input_df)[0]
             st.success(f"Prediction: {pred}")
+            if pred == 1:
+                st.info("Good Standing")
+            elif pred == 0:
+                st.warning("Bad Standing")
             if proba is not None:
                 st.write("Prediction Probabilities:")
                 class_labels = best_model.classes_
